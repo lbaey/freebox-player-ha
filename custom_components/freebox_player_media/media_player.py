@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import aiohttp
 from homeassistant.components.media_player import (
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
@@ -195,8 +196,8 @@ class FreeboxPlayerMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
         return vol.get("mute")
 
     @property
-    def entity_picture(self) -> str | None:
-        """Return the channel logo as entity picture."""
+    def media_image_url(self) -> str | None:
+        """Return the channel logo URL."""
         if (
             not self.coordinator.data
             or self.coordinator.data.get("power_state") != "running"
@@ -205,10 +206,28 @@ class FreeboxPlayerMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
         channel = _get_channel(self.coordinator.data)
         uuid = channel.get("channelUuid", "")
         cached = self._channels.get(uuid, {})
-        logo = cached.get("logo_url")
-        if logo:
-            return logo
-        return None
+        return cached.get("logo_url") or None
+
+    @property
+    def media_image_remotely_accessible(self) -> bool:
+        """The Freebox uses a self-signed cert, so HA must proxy the image."""
+        return False
+
+    async def async_get_media_image(self) -> tuple[bytes | None, str | None]:
+        """Fetch the channel logo from the Freebox (skip SSL verification)."""
+        url = self.media_image_url
+        if not url:
+            return None, None
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, ssl=False, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                    if resp.status == 200:
+                        content = await resp.read()
+                        content_type = resp.content_type
+                        return content, content_type
+        except Exception:  # noqa: BLE001
+            pass
+        return None, None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
