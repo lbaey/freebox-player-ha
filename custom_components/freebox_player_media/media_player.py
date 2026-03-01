@@ -53,6 +53,7 @@ async def async_setup_entry(
                 coordinator=coordinator,
                 player=player,
                 entry_id=entry.entry_id,
+                channels=data.channels,
             )
         )
     async_add_entities(entities)
@@ -87,10 +88,12 @@ class FreeboxPlayerMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
         coordinator,
         player: dict[str, Any],
         entry_id: str,
+        channels: dict[str, dict[str, Any]],
     ) -> None:
         """Initialize the Freebox Player media player."""
         super().__init__(coordinator)
         self._player_id = player["id"]
+        self._channels = channels
         self._player_name = player.get(
             "device_name", player.get("name", "Freebox Player")
         )
@@ -171,6 +174,22 @@ class FreeboxPlayerMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
         if not pkg:
             return None
         return APP_NAMES.get(pkg, pkg.split(".")[-1] if "." in pkg else pkg)
+
+    @property
+    def entity_picture(self) -> str | None:
+        """Return the channel logo as entity picture."""
+        if (
+            not self.coordinator.data
+            or self.coordinator.data.get("power_state") != "running"
+        ):
+            return None
+        channel = _get_channel(self.coordinator.data)
+        uuid = channel.get("channelUuid", "")
+        cached = self._channels.get(uuid, {})
+        logo = cached.get("logo_url")
+        if logo:
+            return logo
+        return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
