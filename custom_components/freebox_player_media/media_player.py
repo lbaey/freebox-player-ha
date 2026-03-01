@@ -32,6 +32,7 @@ APP_NAMES = {
     "com.arte.android.tv": "Arte",
     "fr.francetv.pluzz": "France TV",
     "fr.freebox.player": "Freebox Player",
+    "fr.freebox.tv": "TV Freebox",
     "com.molotov.tv": "Molotov",
 }
 
@@ -52,10 +53,27 @@ async def async_setup_entry(
                 coordinator=coordinator,
                 player=player,
                 entry_id=entry.entry_id,
-                channels=data.channels,
             )
         )
     async_add_entities(entities)
+
+
+def _get_channel(data: dict[str, Any]) -> dict[str, Any]:
+    """Extract channel dict from API data."""
+    return (
+        data.get("foreground_app", {})
+        .get("context", {})
+        .get("channel", {})
+    )
+
+
+def _get_player_ctx(data: dict[str, Any]) -> dict[str, Any]:
+    """Extract player context from API data."""
+    return (
+        data.get("foreground_app", {})
+        .get("context", {})
+        .get("player", {})
+    )
 
 
 class FreeboxPlayerMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
@@ -69,7 +87,6 @@ class FreeboxPlayerMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
         coordinator,
         player: dict[str, Any],
         entry_id: str,
-        channels: dict[str, dict[str, Any]],
     ) -> None:
         """Initialize the Freebox Player media player."""
         super().__init__(coordinator)
@@ -77,7 +94,6 @@ class FreeboxPlayerMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
         self._player_name = player.get(
             "device_name", player.get("name", "Freebox Player")
         )
-        self._channels = channels
         self._attr_unique_id = f"{entry_id}_player_{player['id']}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{player['id']}")},
@@ -104,12 +120,11 @@ class FreeboxPlayerMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
         power = self.coordinator.data.get("power_state")
         if power != "running":
             return MediaPlayerState.OFF
-        fg = self.coordinator.data.get("foreground_app", {})
-        media_info = fg.get("media_info", {})
-        playback = media_info.get("playback_state", "")
-        if playback == "playing":
+        player_ctx = _get_player_ctx(self.coordinator.data)
+        playback = player_ctx.get("playbackState", "")
+        if playback == "play":
             return MediaPlayerState.PLAYING
-        if playback == "paused":
+        if playback == "pause":
             return MediaPlayerState.PAUSED
         return MediaPlayerState.ON
 
@@ -121,17 +136,21 @@ class FreeboxPlayerMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
             or self.coordinator.data.get("power_state") != "running"
         ):
             return None
-        channel = self.coordinator.data.get("current_channel", {})
-        if channel and channel.get("name"):
-            return channel["name"]
-        # Fallback: parse cur_url for channel UUID and look up in cache
-        fg = self.coordinator.data.get("foreground_app", {})
-        cur_url = fg.get("cur_url", "")
-        if cur_url.startswith("tv://"):
-            uuid = cur_url.replace("tv://", "")
-            cached = self._channels.get(uuid, {})
-            if cached.get("name"):
-                return cached["name"]
+        channel = _get_channel(self.coordinator.data)
+        return channel.get("channelName")
+
+    @property
+    def media_channel(self) -> str | None:
+        """Return the channel number as string."""
+        if (
+            not self.coordinator.data
+            or self.coordinator.data.get("power_state") != "running"
+        ):
+            return None
+        channel = _get_channel(self.coordinator.data)
+        num = channel.get("channelNumber")
+        if num is not None:
+            return str(num)
         return None
 
     @property
@@ -154,25 +173,6 @@ class FreeboxPlayerMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
         return APP_NAMES.get(pkg, pkg.split(".")[-1] if "." in pkg else pkg)
 
     @property
-    def volume_level(self) -> float | None:
-        """Return the volume level (0.0 to 1.0)."""
-        if not self.coordinator.data:
-            return None
-        vol = self.coordinator.data.get("volume", {})
-        level = vol.get("level")
-        if level is not None:
-            return level / 100.0
-        return None
-
-    @property
-    def is_volume_muted(self) -> bool | None:
-        """Return whether the player is muted."""
-        if not self.coordinator.data:
-            return None
-        vol = self.coordinator.data.get("volume", {})
-        return vol.get("muted")
-
-    @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
         attrs: dict[str, Any] = {}
@@ -181,58 +181,49 @@ class FreeboxPlayerMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
         if self.app_name:
             attrs["app_name"] = self.app_name
         if self.coordinator.data:
-            channel = self.coordinator.data.get("current_channel", {})
-            uuid = channel.get("uuid", "")
-            cached = self._channels.get(uuid, {})
-            if cached.get("number"):
-                attrs["channel_number"] = cached["number"]
-            if channel.get("logo_url"):
-                attrs["channel_logo"] = channel["logo_url"]
+            channel = _get_channel(self.coordinator.data)
+            if channel.get("channelNumber") is not None:
+                attrs["channel_number"] = channel["channelNumber"]
+            if channel.get("channelUuid"):
+                attrs["channel_uuid"] = channel["channelUuid"]
+            if channel.get("bouquetName"):
+                attrs["bouquet"] = channel["bouquetName"]
         return attrs
 
     # -- Control methods (stubs) -----------------------------------------------
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the player."""
-        # TODO: needs remote_code support
         LOGGER.warning("Control not yet implemented: turn_on")
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the player."""
-        # TODO: needs remote_code support
         LOGGER.warning("Control not yet implemented: turn_off")
 
     async def async_volume_up(self) -> None:
         """Increase volume."""
-        # TODO: needs remote_code support
         LOGGER.warning("Control not yet implemented: volume_up")
 
     async def async_volume_down(self) -> None:
         """Decrease volume."""
-        # TODO: needs remote_code support
         LOGGER.warning("Control not yet implemented: volume_down")
 
     async def async_mute_volume(self, mute: bool) -> None:
         """Mute or unmute the player."""
-        # TODO: needs remote_code support
         LOGGER.warning("Control not yet implemented: mute_volume")
 
     async def async_media_play(self) -> None:
         """Play media."""
-        # TODO: needs remote_code support
         LOGGER.warning("Control not yet implemented: media_play")
 
     async def async_media_pause(self) -> None:
         """Pause media."""
-        # TODO: needs remote_code support
         LOGGER.warning("Control not yet implemented: media_pause")
 
     async def async_media_previous_track(self) -> None:
         """Switch to previous channel."""
-        # TODO: needs remote_code support
         LOGGER.warning("Control not yet implemented: media_previous_track")
 
     async def async_media_next_track(self) -> None:
         """Switch to next channel."""
-        # TODO: needs remote_code support
         LOGGER.warning("Control not yet implemented: media_next_track")

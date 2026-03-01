@@ -34,22 +34,6 @@ class FreeboxPlayerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch player status from the Freebox API."""
         try:
-            data = await self.fbx.player.get_player_status(self.player_id)
-            # Temporary debug: log structure keys
-            fg = data.get("foreground_app", {})
-            ctx = fg.get("context", {})
-            ch = ctx.get("channel", {})
-            ch_keys = {k: type(v).__name__ for k, v in ch.items()}
-            LOGGER.warning(
-                "Player %s keys: top=%s | fg=%s | ctx=%s | channel=%s | channel.name=%s | channel.number=%s",
-                self.player_id,
-                list(data.keys()),
-                list(fg.keys()),
-                list(ctx.keys()),
-                ch_keys,
-                ch.get("name"),
-                ch.get("number"),
-            )
-            return data
+            return await self.fbx.player.get_player_status(self.player_id)
         except Exception as exception:
             raise UpdateFailed(exception) from exception
