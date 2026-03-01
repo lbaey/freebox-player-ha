@@ -4,20 +4,36 @@ from __future__ import annotations
 
 from typing import Any
 
+import aiohttp
 import voluptuous as vol
 from freebox_api.exceptions import AuthorizationError, HttpRequestError
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_PORT
 
-from .const import DEFAULT_HOST, DEFAULT_PORT, DOMAIN
-
+from .const import DEFAULT_HOST, DOMAIN, LOGGER
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_HOST, default=DEFAULT_HOST): str,
-        vol.Required(CONF_PORT, default=DEFAULT_PORT): int,
     }
 )
+
+
+async def _discover_api(host: str) -> tuple[str, int]:
+    """Discover the real API domain and HTTPS port from the Freebox."""
+    async with aiohttp.ClientSession() as session:
+        # Try HTTPS first (port 443), then HTTP (port 80)
+        for url in [f"https://{host}/api_version", f"http://{host}/api_version"]:
+            try:
+                async with session.get(url, ssl=False, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        api_domain = data.get("api_domain", host)
+                        https_port = int(data.get("https_port", 443))
+                        return api_domain, https_port
+            except Exception:  # noqa: BLE001
+                continue
+    return host, 443
 
 
 class FreeboxPlayerMediaConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -38,10 +54,19 @@ class FreeboxPlayerMediaConfigFlow(ConfigFlow, domain=DOMAIN):
                 step_id="user", data_schema=STEP_USER_DATA_SCHEMA
             )
 
-        await self.async_set_unique_id(user_input[CONF_HOST])
+        host = user_input[CONF_HOST]
+
+        # Discover the real API domain and HTTPS port
+        api_domain, https_port = await _discover_api(host)
+        LOGGER.info(
+            "Freebox discovery: %s -> api_domain=%s, https_port=%s",
+            host, api_domain, https_port,
+        )
+
+        await self.async_set_unique_id(api_domain)
         self._abort_if_unique_id_configured()
 
-        self._data = user_input
+        self._data = {CONF_HOST: api_domain, CONF_PORT: https_port}
         return await self.async_step_link()
 
     async def async_step_link(
@@ -53,16 +78,16 @@ class FreeboxPlayerMediaConfigFlow(ConfigFlow, domain=DOMAIN):
 
         errors: dict[str, str] = {}
         try:
-            # Import here to avoid circular imports.
             from . import get_api
-            from .const import LOGGER
 
             fbx = await get_api(self.hass, self._data[CONF_HOST])
-            LOGGER.warning("Config flow: calling fbx.open(%s, %s)", self._data[CONF_HOST], self._data[CONF_PORT])
+            LOGGER.info(
+                "Config flow: calling fbx.open(%s, %s)",
+                self._data[CONF_HOST], self._data[CONF_PORT],
+            )
             await fbx.open(self._data[CONF_HOST], self._data[CONF_PORT])
-            LOGGER.warning("Config flow: fbx.open() succeeded, calling system.get_config()")
+            LOGGER.info("Config flow: fbx.open() succeeded")
             await fbx.system.get_config()
-            LOGGER.warning("Config flow: system.get_config() succeeded, creating entry")
             await fbx.close()
             return self.async_create_entry(
                 title=self._data[CONF_HOST], data=self._data
