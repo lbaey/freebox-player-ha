@@ -35,7 +35,7 @@ class FreeboxPlayerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Fetch player status from the Freebox API."""
         try:
             data = await self.fbx.player.get_player_status(self.player_id)
-            LOGGER.debug("Player %s raw data: %s", self.player_id, data)
+            LOGGER.warning("Player %s raw data: %s", self.player_id, data)
             return data
         except Exception as exception:
             raise UpdateFailed(exception) from exception
