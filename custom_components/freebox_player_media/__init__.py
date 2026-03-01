@@ -68,15 +68,19 @@ async def async_setup_entry(
         ) from err
 
     # Try to fetch TV channels for metadata (logos, etc.)
+    base_url = f"https://{host}:{port}"
     channels: dict[str, dict[str, Any]] = {}
     try:
         raw_channels = await fbx.tv.get_tv_channels()
         # raw_channels is a dict keyed by UUID
         for uuid, ch in raw_channels.items():
+            logo = ch.get("logo_url", "")
+            if logo and logo.startswith("/"):
+                logo = f"{base_url}{logo}"
             channels[uuid] = {
                 "name": ch.get("name", ""),
                 "number": ch.get("number"),
-                "logo_url": ch.get("logo_url", ""),
+                "logo_url": logo,
             }
         LOGGER.info("Loaded %d TV channels from Freebox", len(channels))
     except Exception as err:  # noqa: BLE001
