@@ -67,10 +67,11 @@ async def async_setup_entry(
             "(Gestion des accès → Applications → HA Freebox Player)."
         ) from err
 
-    # Try to fetch TV channels for metadata; not all firmware versions expose this.
+    # Try to fetch TV channels for metadata (logos, etc.)
     channels: dict[str, dict[str, Any]] = {}
     try:
         raw_channels = await fbx.tv.get_channels()
+        LOGGER.info("Loaded %d TV channels from Freebox", len(raw_channels))
         for ch in raw_channels:
             uuid = ch.get("uuid", "")
             channels[uuid] = {
@@ -78,8 +79,8 @@ async def async_setup_entry(
                 "number": ch.get("number"),
                 "logo_url": ch.get("logo_url", ""),
             }
-    except Exception:  # noqa: BLE001
-        LOGGER.debug("TV channel list unavailable, skipping channel cache")
+    except Exception as err:  # noqa: BLE001
+        LOGGER.warning("TV channel list unavailable (%s: %s), skipping channel cache", type(err).__name__, err)
 
     # Create a coordinator per player.
     coordinators: dict[int, FreeboxPlayerCoordinator] = {}
