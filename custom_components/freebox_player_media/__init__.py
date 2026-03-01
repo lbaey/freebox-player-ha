@@ -71,7 +71,7 @@ async def async_setup_entry(
     channels: dict[str, dict[str, Any]] = {}
     try:
         raw_channels = await fbx.tv.get_channels()
-        LOGGER.info("Loaded %d TV channels from Freebox", len(raw_channels))
+        LOGGER.warning("Loaded %d TV channels from Freebox. Sample UUIDs: %s", len(raw_channels), [ch.get("uuid","") for ch in raw_channels[:5]])
         for ch in raw_channels:
             uuid = ch.get("uuid", "")
             channels[uuid] = {
