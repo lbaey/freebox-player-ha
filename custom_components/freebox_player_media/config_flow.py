@@ -55,19 +55,26 @@ class FreeboxPlayerMediaConfigFlow(ConfigFlow, domain=DOMAIN):
         try:
             # Import here to avoid circular imports.
             from . import get_api
+            from .const import LOGGER
 
             fbx = await get_api(self.hass, self._data[CONF_HOST])
+            LOGGER.warning("Config flow: calling fbx.open(%s, %s)", self._data[CONF_HOST], self._data[CONF_PORT])
             await fbx.open(self._data[CONF_HOST], self._data[CONF_PORT])
+            LOGGER.warning("Config flow: fbx.open() succeeded, calling system.get_config()")
             await fbx.system.get_config()
+            LOGGER.warning("Config flow: system.get_config() succeeded, creating entry")
             await fbx.close()
             return self.async_create_entry(
                 title=self._data[CONF_HOST], data=self._data
             )
-        except AuthorizationError:
+        except AuthorizationError as err:
+            LOGGER.error("Config flow: AuthorizationError: %s", err)
             errors["base"] = "register_failed"
-        except HttpRequestError:
+        except HttpRequestError as err:
+            LOGGER.error("Config flow: HttpRequestError: %s", err)
             errors["base"] = "cannot_connect"
-        except Exception:  # noqa: BLE001
+        except Exception as err:  # noqa: BLE001
+            LOGGER.error("Config flow: unexpected error: %s: %s", type(err).__name__, err)
             errors["base"] = "unknown"
 
         return self.async_show_form(step_id="link", errors=errors)

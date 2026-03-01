@@ -1,15 +1,16 @@
 """Constants for freebox_player_media."""
 
+import socket
 from logging import Logger, getLogger
 
 LOGGER: Logger = getLogger(__package__)
 DOMAIN = "freebox_player_media"
 
 APP_DESC = {
-    "app_id": "hass",
-    "app_name": "Home Assistant",
+    "app_id": "hass.player",
+    "app_name": "HA Freebox Player",
     "app_version": "1.0.0",
-    "device_name": "homeassistant",
+    "device_name": socket.gethostname(),
 }
 API_VERSION = "v6"
 STORAGE_KEY = DOMAIN
