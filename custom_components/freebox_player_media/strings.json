@@ -1,0 +1,26 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Freebox Player Media",
+        "description": "Enter your Freebox Server address.",
+        "data": {
+          "host": "Host",
+          "port": "Port"
+        }
+      },
+      "link": {
+        "title": "Authorize",
+        "description": "Press the right arrow (\u27a1) on your Freebox Server front panel to authorize access, then click Submit."
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to the Freebox. Check the host and port.",
+      "register_failed": "Authorization failed. Make sure to press the button on the Freebox.",
+      "unknown": "An unknown error occurred."
+    },
+    "abort": {
+      "already_configured": "This Freebox is already configured."
+    }
+  }
+}

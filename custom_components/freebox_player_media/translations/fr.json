@@ -1,0 +1,26 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Freebox Player Media",
+        "description": "Entrez l'adresse de votre Freebox Server.",
+        "data": {
+          "host": "H\u00f4te",
+          "port": "Port"
+        }
+      },
+      "link": {
+        "title": "Autorisation",
+        "description": "Appuyez sur la fl\u00e8che droite (\u27a1) sur la fa\u00e7ade de votre Freebox Server pour autoriser l'acc\u00e8s, puis cliquez sur Soumettre."
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossible de se connecter \u00e0 la Freebox. V\u00e9rifiez l'h\u00f4te et le port.",
+      "register_failed": "Autorisation \u00e9chou\u00e9e. Appuyez sur le bouton de la Freebox.",
+      "unknown": "Une erreur inconnue s'est produite."
+    },
+    "abort": {
+      "already_configured": "Cette Freebox est d\u00e9j\u00e0 configur\u00e9e."
+    }
+  }
+}

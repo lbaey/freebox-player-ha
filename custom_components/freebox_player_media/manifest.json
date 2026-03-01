@@ -1,0 +1,11 @@
+{
+  "domain": "freebox_player_media",
+  "name": "Freebox Player Media",
+  "version": "1.0.0",
+  "config_flow": true,
+  "iot_class": "local_polling",
+  "requirements": ["freebox-api==1.1.0"],
+  "codeowners": ["@lbaey"],
+  "documentation": "https://github.com/lbaey/freebox-player-ha",
+  "issue_tracker": "https://github.com/lbaey/freebox-player-ha/issues"
+}
