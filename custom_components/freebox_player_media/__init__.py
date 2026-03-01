@@ -8,9 +8,11 @@ from pathlib import Path
 from typing import Any
 
 from freebox_api import Freepybox
+from freebox_api.exceptions import InsufficientPermissionsError
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT, Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.storage import Store
 from slugify import slugify
 
@@ -51,7 +53,19 @@ async def async_setup_entry(
     fbx = await get_api(hass, host)
     await fbx.open(host, port)
 
-    players: list[dict[str, Any]] = await fbx.player.get_players()
+    try:
+        players: list[dict[str, Any]] = await fbx.player.get_players()
+    except InsufficientPermissionsError as err:
+        await fbx.close()
+        LOGGER.error(
+            "Permission 'player' manquante pour l'app 'HA Freebox Player'. "
+            "Activez-la dans Freebox OS → Paramètres → Gestion des accès → "
+            "Applications → HA Freebox Player → cochez 'Player'"
+        )
+        raise ConfigEntryNotReady(
+            "Permission 'player' manquante. Activez-la dans Freebox OS "
+            "(Gestion des accès → Applications → HA Freebox Player)."
+        ) from err
 
     # Try to fetch TV channels for metadata; not all firmware versions expose this.
     channels: dict[str, dict[str, Any]] = {}
