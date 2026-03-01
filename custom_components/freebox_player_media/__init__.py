@@ -71,14 +71,14 @@ async def async_setup_entry(
     channels: dict[str, dict[str, Any]] = {}
     try:
         raw_channels = await fbx.tv.get_tv_channels()
-        LOGGER.warning("Loaded %d TV channels. Sample: %s", len(raw_channels), [{"uuid": ch.get("uuid",""), "name": ch.get("name",""), "logo": ch.get("logo_url","")} for ch in raw_channels[:3]])
-        for ch in raw_channels:
-            uuid = ch.get("uuid", "")
+        # raw_channels is a dict keyed by UUID
+        for uuid, ch in raw_channels.items():
             channels[uuid] = {
                 "name": ch.get("name", ""),
                 "number": ch.get("number"),
                 "logo_url": ch.get("logo_url", ""),
             }
+        LOGGER.info("Loaded %d TV channels from Freebox", len(channels))
     except Exception as err:  # noqa: BLE001
         LOGGER.warning("TV channel list unavailable (%s: %s), skipping channel cache", type(err).__name__, err)
 
