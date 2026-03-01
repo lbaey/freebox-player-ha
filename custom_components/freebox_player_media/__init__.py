@@ -70,8 +70,8 @@ async def async_setup_entry(
     # Try to fetch TV channels for metadata (logos, etc.)
     channels: dict[str, dict[str, Any]] = {}
     try:
-        raw_channels = await fbx.tv.get_channels()
-        LOGGER.warning("Loaded %d TV channels from Freebox. Sample UUIDs: %s", len(raw_channels), [ch.get("uuid","") for ch in raw_channels[:5]])
+        raw_channels = await fbx.tv.get_tv_channels()
+        LOGGER.warning("Loaded %d TV channels. Sample: %s", len(raw_channels), [{"uuid": ch.get("uuid",""), "name": ch.get("name",""), "logo": ch.get("logo_url","")} for ch in raw_channels[:3]])
         for ch in raw_channels:
             uuid = ch.get("uuid", "")
             channels[uuid] = {

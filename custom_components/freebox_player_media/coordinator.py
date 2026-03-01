@@ -32,8 +32,15 @@ class FreeboxPlayerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.player_id = player_id
 
     async def _async_update_data(self) -> dict[str, Any]:
-        """Fetch player status from the Freebox API."""
+        """Fetch player status and volume from the Freebox API."""
         try:
-            return await self.fbx.player.get_player_status(self.player_id)
+            status = await self.fbx.player.get_player_status(self.player_id)
+            # Fetch volume separately (not included in status)
+            try:
+                volume = await self.fbx.player.get_player_volume(self.player_id)
+                status["volume"] = volume
+            except Exception:  # noqa: BLE001
+                pass
+            return status
         except Exception as exception:
             raise UpdateFailed(exception) from exception

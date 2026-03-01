@@ -93,10 +93,10 @@ class FreeboxPlayerMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
         """Initialize the Freebox Player media player."""
         super().__init__(coordinator)
         self._player_id = player["id"]
-        self._channels = channels
         self._player_name = player.get(
             "device_name", player.get("name", "Freebox Player")
         )
+        self._channels = channels
         self._attr_unique_id = f"{entry_id}_player_{player['id']}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{player['id']}")},
@@ -107,10 +107,10 @@ class FreeboxPlayerMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
         self._attr_supported_features = (
             MediaPlayerEntityFeature.PAUSE
             | MediaPlayerEntityFeature.PLAY
+            | MediaPlayerEntityFeature.STOP
+            | MediaPlayerEntityFeature.VOLUME_SET
             | MediaPlayerEntityFeature.VOLUME_STEP
             | MediaPlayerEntityFeature.VOLUME_MUTE
-            | MediaPlayerEntityFeature.TURN_ON
-            | MediaPlayerEntityFeature.TURN_OFF
             | MediaPlayerEntityFeature.PREVIOUS_TRACK
             | MediaPlayerEntityFeature.NEXT_TRACK
         )
@@ -176,6 +176,25 @@ class FreeboxPlayerMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
         return APP_NAMES.get(pkg, pkg.split(".")[-1] if "." in pkg else pkg)
 
     @property
+    def volume_level(self) -> float | None:
+        """Return the volume level (0.0 to 1.0)."""
+        if not self.coordinator.data:
+            return None
+        vol = self.coordinator.data.get("volume", {})
+        level = vol.get("volume")
+        if level is not None:
+            return level / 100.0
+        return None
+
+    @property
+    def is_volume_muted(self) -> bool | None:
+        """Return whether the player is muted."""
+        if not self.coordinator.data:
+            return None
+        vol = self.coordinator.data.get("volume", {})
+        return vol.get("mute")
+
+    @property
     def entity_picture(self) -> str | None:
         """Return the channel logo as entity picture."""
         if (
@@ -209,40 +228,63 @@ class FreeboxPlayerMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
                 attrs["bouquet"] = channel["bouquetName"]
         return attrs
 
-    # -- Control methods (stubs) -----------------------------------------------
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn on the player."""
-        LOGGER.warning("Control not yet implemented: turn_on")
-
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn off the player."""
-        LOGGER.warning("Control not yet implemented: turn_off")
-
-    async def async_volume_up(self) -> None:
-        """Increase volume."""
-        LOGGER.warning("Control not yet implemented: volume_up")
-
-    async def async_volume_down(self) -> None:
-        """Decrease volume."""
-        LOGGER.warning("Control not yet implemented: volume_down")
-
-    async def async_mute_volume(self, mute: bool) -> None:
-        """Mute or unmute the player."""
-        LOGGER.warning("Control not yet implemented: mute_volume")
+    # -- Control methods -------------------------------------------------------
 
     async def async_media_play(self) -> None:
         """Play media."""
-        LOGGER.warning("Control not yet implemented: media_play")
+        await self.coordinator.fbx.player.execute_media_control_command(
+            "play", self._player_id
+        )
+        await self.coordinator.async_request_refresh()
 
     async def async_media_pause(self) -> None:
         """Pause media."""
-        LOGGER.warning("Control not yet implemented: media_pause")
+        await self.coordinator.fbx.player.execute_media_control_command(
+            "pause", self._player_id
+        )
+        await self.coordinator.async_request_refresh()
+
+    async def async_media_stop(self) -> None:
+        """Stop media."""
+        await self.coordinator.fbx.player.execute_media_control_command(
+            "stop", self._player_id
+        )
+        await self.coordinator.async_request_refresh()
 
     async def async_media_previous_track(self) -> None:
         """Switch to previous channel."""
-        LOGGER.warning("Control not yet implemented: media_previous_track")
+        await self.coordinator.fbx.player.execute_media_control_command(
+            "previous", self._player_id
+        )
+        await self.coordinator.async_request_refresh()
 
     async def async_media_next_track(self) -> None:
         """Switch to next channel."""
-        LOGGER.warning("Control not yet implemented: media_next_track")
+        await self.coordinator.fbx.player.execute_media_control_command(
+            "next", self._player_id
+        )
+        await self.coordinator.async_request_refresh()
+
+    async def async_set_volume_level(self, volume: float) -> None:
+        """Set volume level (0.0 to 1.0)."""
+        await self.coordinator.fbx.player.update_player_volume(
+            volume=int(volume * 100), player_id=self._player_id
+        )
+        await self.coordinator.async_request_refresh()
+
+    async def async_volume_up(self) -> None:
+        """Increase volume."""
+        current = self.volume_level or 0.0
+        await self.async_set_volume_level(min(1.0, current + 0.05))
+
+    async def async_volume_down(self) -> None:
+        """Decrease volume."""
+        current = self.volume_level or 0.0
+        await self.async_set_volume_level(max(0.0, current - 0.05))
+
+    async def async_mute_volume(self, mute: bool) -> None:
+        """Mute or unmute the player."""
+        await self.coordinator.fbx.player.update_player_volume(
+            mute=mute, player_id=self._player_id
+        )
+        await self.coordinator.async_request_refresh()
